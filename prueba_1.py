@@ -5,12 +5,16 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, Q
     QTableWidgetItem, QLabel, QMessageBox
 
 
-
 class Actor:
     def __init__(self, id_actor, nombre):
         self.id_actor = id_actor
         self.nombre = nombre
 
+    def __str__(self):
+        return f"Actor(ID: {self.id_actor}, Nombre: {self.nombre})"
+
+    def to_dict(self):
+        return {"id_actor": self.id_actor, "nombre": self.nombre}
 
 
 class Pelicula:
@@ -21,6 +25,17 @@ class Pelicula:
         self.puntuacion = puntuacion
         self.sinopsis = sinopsis
 
+    def __str__(self):
+        return f"Pelicula(ID: {self.id_pelicula}, Título: {self.titulo}, Año: {self.anio}, Puntuación: {self.puntuacion})"
+
+    def to_dict(self):
+        return {
+            "id_pelicula": self.id_pelicula,
+            "titulo": self.titulo,
+            "anio": self.anio,
+            "puntuacion": self.puntuacion,
+            "sinopsis": self.sinopsis
+        }
 
 
 class GestorPeliculas:
@@ -73,15 +88,6 @@ class GestorPeliculas:
             print(f"Error al buscar películas comunes: {e}")
             return []
 
-    def obtener_actores(self):
-        try:
-            query = "SELECT ID_Actor, Actor_Protagonista FROM actores"
-            self.__cursor.execute(query)
-            return [Actor(id_actor, nombre) for id_actor, nombre in self.__cursor.fetchall()]
-        except Error as e:
-            print(f"Error al obtener actores: {e}")
-            return []
-
 
 
 class VistaCatalogoPeliculas(QMainWindow):
@@ -108,6 +114,7 @@ class VistaCatalogoPeliculas(QMainWindow):
         self.result_table.setColumnCount(5)
         self.result_table.setHorizontalHeaderLabels(["ID", "Título", "Año", "Puntuación", "Sinopsis"])
         self.layout.addWidget(self.result_table)
+        self.result_table.cellDoubleClicked.connect(self.mostrar_detalles_pelicula)
 
         self.actor1_input = QLineEdit(self)
         self.actor1_input.setPlaceholderText("Escribir Actor 1")
@@ -128,7 +135,6 @@ class VistaCatalogoPeliculas(QMainWindow):
         sinopsis = self.result_table.item(row, 4).text()
         QMessageBox.information(self, "Detalles de la Película",
                                 f"ID: {id_pelicula}\nTítulo: {titulo}\nSinopsis: {sinopsis}")
-
 
 
 class ControladorCatalogoPeliculas:
@@ -166,7 +172,6 @@ class ControladorCatalogoPeliculas:
                 QMessageBox.warning(self.vista, "Sin Resultados", "No se encontraron películas comunes.")
         else:
             QMessageBox.warning(self.vista, "Campos Vacíos", "Por favor, complete ambos campos de actores.")
-
 
 
 if __name__ == "__main__":
