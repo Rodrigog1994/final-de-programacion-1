@@ -9,12 +9,17 @@ class Actor:
     def __init__(self, id_actor, nombre):
         self.id_actor = id_actor
         self.nombre = nombre
+        self.peliculas = []
 
-    def __str__(self):
-        return f"Actor(ID: {self.id_actor}, Nombre: {self.nombre})"
+    def agregar_pelicula(self, pelicula):
+        self.peliculas.append(pelicula)
 
-    def to_dict(self):
-        return {"id_actor": self.id_actor, "nombre": self.nombre}
+    def listar_peliculas(self):
+        return [p.titulo for p in self.peliculas]
+
+
+
+
 
 
 class Pelicula:
@@ -24,18 +29,15 @@ class Pelicula:
         self.anio = anio
         self.puntuacion = puntuacion
         self.sinopsis = sinopsis
+        self.actores = []
 
-    def __str__(self):
-        return f"Pelicula(ID: {self.id_pelicula}, Título: {self.titulo}, Año: {self.anio}, Puntuación: {self.puntuacion})"
+    def agregar_actor(self, actor):
+        self.actores.append(actor)
+        actor.agregar_pelicula(self)
 
-    def to_dict(self):
-        return {
-            "id_pelicula": self.id_pelicula,
-            "titulo": self.titulo,
-            "anio": self.anio,
-            "puntuacion": self.puntuacion,
-            "sinopsis": self.sinopsis
-        }
+    def listar_actores(self):
+        return [a.nombre for a in self.actores]
+
 
 
 class GestorPeliculas:
@@ -88,6 +90,19 @@ class GestorPeliculas:
             print(f"Error al buscar películas comunes: {e}")
             return []
 
+    def obtener_actores_por_pelicula(self, id_pelicula):
+        try:
+            query = """
+            SELECT a.ID_Actor, a.Actor_Protagonista
+            FROM actores a
+            JOIN Tabla_Pelicula_Actor pa ON a.ID_Actor = pa.ID_Actor
+            WHERE pa.ID_Pelicula = %s
+            """
+            self.__cursor.execute(query, (id_pelicula,))
+            return [Actor(*actor) for actor in self.__cursor.fetchall()]
+        except Error as e:
+            print(f"Error al obtener actores: {e}")
+            return []
 
 
 class VistaCatalogoPeliculas(QMainWindow):
@@ -133,8 +148,15 @@ class VistaCatalogoPeliculas(QMainWindow):
         id_pelicula = self.result_table.item(row, 0).text()
         titulo = self.result_table.item(row, 1).text()
         sinopsis = self.result_table.item(row, 4).text()
-        QMessageBox.information(self, "Detalles de la Película",
-                                f"ID: {id_pelicula}\nTítulo: {titulo}\nSinopsis: {sinopsis}")
+
+
+        actores = self.gestor.obtener_actores_por_pelicula(id_pelicula)
+        nombres_actores = ", ".join([actor.nombre for actor in actores])
+
+        QMessageBox.information(
+            self, "Detalles de la Película",
+            f"ID: {id_pelicula}\nTítulo: {titulo}\nSinopsis: {sinopsis}\nActores: {nombres_actores}"
+        )
 
 
 class ControladorCatalogoPeliculas:
