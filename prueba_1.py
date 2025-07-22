@@ -99,11 +99,11 @@ class GestorPeliculas:
             print(f"Error al cargar relaciones: {e}")
 
     def buscar_pelicula_por_titulo(self, titulo):
-        # Busca en memoria, no en la base
+
         return [p for p in self.peliculas.values() if titulo.lower() in p.titulo.lower()]
 
     def buscar_peliculas_comunes(self, actor1_nombre, actor2_nombre):
-        # Busca en memoria, no en la base
+
         actor1 = next((a for a in self.actores.values() if actor1_nombre.lower() in a.nombre.lower()), None)
         actor2 = next((a for a in self.actores.values() if actor2_nombre.lower() in a.nombre.lower()), None)
         if actor1 and actor2:
