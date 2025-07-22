@@ -36,7 +36,7 @@ class Pelicula:
     def listar_actores(self):
         return [a.nombre for a in self.actores]
 
-# === GESTOR ===
+
 
 class GestorPeliculas:
     def __init__(self):
@@ -107,7 +107,7 @@ class GestorPeliculas:
         actor1 = next((a for a in self.actores.values() if actor1_nombre.lower() in a.nombre.lower()), None)
         actor2 = next((a for a in self.actores.values() if actor2_nombre.lower() in a.nombre.lower()), None)
         if actor1 and actor2:
-            # Intersección de películas
+
             peliculas_comunes = set(actor1.peliculas) & set(actor2.peliculas)
             return list(peliculas_comunes)
         return []
@@ -118,7 +118,7 @@ class GestorPeliculas:
             return pelicula.actores
         return []
 
-# === VISTA ===
+
 
 class VistaCatalogoPeliculas(QMainWindow):
     def __init__(self, gestor):
