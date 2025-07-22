@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, Q
     QTableWidgetItem, QLabel, QMessageBox
 
 
+
 class Actor:
     def __init__(self, id_actor, nombre):
         self.id_actor = id_actor
@@ -12,15 +13,11 @@ class Actor:
         self.peliculas = []
 
     def agregar_pelicula(self, pelicula):
-        self.peliculas.append(pelicula)
+        if pelicula not in self.peliculas:
+            self.peliculas.append(pelicula)
 
     def listar_peliculas(self):
         return [p.titulo for p in self.peliculas]
-
-
-
-
-
 
 class Pelicula:
     def __init__(self, id_pelicula, titulo, anio, puntuacion, sinopsis):
@@ -32,19 +29,23 @@ class Pelicula:
         self.actores = []
 
     def agregar_actor(self, actor):
-        self.actores.append(actor)
-        actor.agregar_pelicula(self)
+        if actor not in self.actores:
+            self.actores.append(actor)
+            actor.agregar_pelicula(self)
 
     def listar_actores(self):
         return [a.nombre for a in self.actores]
 
-
+# === GESTOR ===
 
 class GestorPeliculas:
     def __init__(self):
         self.__conexion = None
         self.__cursor = None
+        self.peliculas = {}
+        self.actores = {}
         self.conectar()
+        self.cargar_datos()
 
     def conectar(self):
         try:
@@ -60,50 +61,64 @@ class GestorPeliculas:
         except Error as e:
             print(f"Error al conectar a la base de datos: {e}")
 
-    def buscar_pelicula_por_titulo(self, titulo):
-        try:
-            query = """
-            SELECT p.ID_Pelicula, p.Titulo, p.Anio, p.Puntuacion, p.Sinopsis
-            FROM Peliculas p
-            WHERE p.Titulo LIKE %s
-            """
-            self.__cursor.execute(query, (f'%{titulo}%',))
-            return [Pelicula(*pelicula) for pelicula in self.__cursor.fetchall()]
-        except Error as e:
-            print(f"Error al buscar película: {e}")
-            return []
+    def cargar_datos(self):
+        self.cargar_peliculas()
+        self.cargar_actores()
+        self.cargar_relaciones()
 
-    def buscar_peliculas_comunes(self, actor1, actor2):
+    def cargar_peliculas(self):
         try:
-            query = """
-            SELECT DISTINCT p.ID_Pelicula, p.Titulo, p.Anio, p.Puntuacion, p.Sinopsis
-            FROM Peliculas p
-            JOIN Tabla_Pelicula_Actor pa1 ON p.ID_Pelicula = pa1.ID_Pelicula
-            JOIN Tabla_Pelicula_Actor pa2 ON p.ID_Pelicula = pa2.ID_Pelicula
-            JOIN actores a1 ON a1.ID_Actor = pa1.ID_Actor
-            JOIN actores a2 ON a2.ID_Actor = pa2.ID_Actor
-            WHERE a1.Actor_Protagonista LIKE %s AND a2.Actor_Protagonista LIKE %s
-            """
-            self.__cursor.execute(query, (f'%{actor1}%', f'%{actor2}%'))
-            return [Pelicula(*pelicula) for pelicula in self.__cursor.fetchall()]
+            query = "SELECT ID_Pelicula, Título, Año, Puntuación, Sinopsis FROM Tabla_Peliculas_Normalizada"
+            self.__cursor.execute(query)
+            for row in self.__cursor.fetchall():
+                pelicula = Pelicula(*row)
+                self.peliculas[pelicula.id_pelicula] = pelicula
         except Error as e:
-            print(f"Error al buscar películas comunes: {e}")
-            return []
+            print(f"Error al cargar películas: {e}")
+
+    def cargar_actores(self):
+        try:
+            query = "SELECT ID_Actor, Nombre FROM Tabla_Actores_Normalizada"
+            self.__cursor.execute(query)
+            for row in self.__cursor.fetchall():
+                actor = Actor(*row)
+                self.actores[actor.id_actor] = actor
+        except Error as e:
+            print(f"Error al cargar actores: {e}")
+
+    def cargar_relaciones(self):
+        try:
+            query = "SELECT ID_Pelicula, ID_Actor FROM Tabla_Pelicula_Actor_Normalizada"
+            self.__cursor.execute(query)
+            for id_pelicula, id_actor in self.__cursor.fetchall():
+                pelicula = self.peliculas.get(id_pelicula)
+                actor = self.actores.get(id_actor)
+                if pelicula and actor:
+                    pelicula.agregar_actor(actor)
+        except Error as e:
+            print(f"Error al cargar relaciones: {e}")
+
+    def buscar_pelicula_por_titulo(self, titulo):
+        # Busca en memoria, no en la base
+        return [p for p in self.peliculas.values() if titulo.lower() in p.titulo.lower()]
+
+    def buscar_peliculas_comunes(self, actor1_nombre, actor2_nombre):
+        # Busca en memoria, no en la base
+        actor1 = next((a for a in self.actores.values() if actor1_nombre.lower() in a.nombre.lower()), None)
+        actor2 = next((a for a in self.actores.values() if actor2_nombre.lower() in a.nombre.lower()), None)
+        if actor1 and actor2:
+            # Intersección de películas
+            peliculas_comunes = set(actor1.peliculas) & set(actor2.peliculas)
+            return list(peliculas_comunes)
+        return []
 
     def obtener_actores_por_pelicula(self, id_pelicula):
-        try:
-            query = """
-            SELECT a.ID_Actor, a.Actor_Protagonista
-            FROM actores a
-            JOIN Tabla_Pelicula_Actor pa ON a.ID_Actor = pa.ID_Actor
-            WHERE pa.ID_Pelicula = %s
-            """
-            self.__cursor.execute(query, (id_pelicula,))
-            return [Actor(*actor) for actor in self.__cursor.fetchall()]
-        except Error as e:
-            print(f"Error al obtener actores: {e}")
-            return []
+        pelicula = self.peliculas.get(id_pelicula)
+        if pelicula:
+            return pelicula.actores
+        return []
 
+# === VISTA ===
 
 class VistaCatalogoPeliculas(QMainWindow):
     def __init__(self, gestor):
@@ -145,10 +160,9 @@ class VistaCatalogoPeliculas(QMainWindow):
         self.layout.addWidget(self.buscar_comunes_button)
 
     def mostrar_detalles_pelicula(self, row, column):
-        id_pelicula = self.result_table.item(row, 0).text()
+        id_pelicula = int(self.result_table.item(row, 0).text())
         titulo = self.result_table.item(row, 1).text()
         sinopsis = self.result_table.item(row, 4).text()
-
 
         actores = self.gestor.obtener_actores_por_pelicula(id_pelicula)
         nombres_actores = ", ".join([actor.nombre for actor in actores])
@@ -157,6 +171,7 @@ class VistaCatalogoPeliculas(QMainWindow):
             self, "Detalles de la Película",
             f"ID: {id_pelicula}\nTítulo: {titulo}\nSinopsis: {sinopsis}\nActores: {nombres_actores}"
         )
+
 
 
 class ControladorCatalogoPeliculas:
@@ -194,6 +209,7 @@ class ControladorCatalogoPeliculas:
                 QMessageBox.warning(self.vista, "Sin Resultados", "No se encontraron películas comunes.")
         else:
             QMessageBox.warning(self.vista, "Campos Vacíos", "Por favor, complete ambos campos de actores.")
+
 
 
 if __name__ == "__main__":
